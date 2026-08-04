@@ -127,6 +127,17 @@
   th.qty-col, td.qty-col{width:80px;}
   th.opt-col, td.opt-col{width:130px;}
 
+  /* Multi-option quantity group: one small qty box per size/colour, so several
+     variants of the same product can be ordered on a single line. */
+  .opt-qty-group{display:flex;flex-wrap:wrap;gap:10px;}
+  .opt-qty-cell{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .opt-qty-cell label{font-size:11px;color:var(--grey);font-weight:600;text-transform:uppercase;letter-spacing:.02em;}
+  .opt-qty-cell input{
+    width:52px;padding:6px 4px;border:1.5px solid var(--border);border-radius:4px;
+    font-size:13px;text-align:center;font-family:'Inter',sans-serif;
+  }
+  td.opt-qty-col{width:auto;}
+
   /* ---------- Submit bar ---------- */
   .submit-bar{
     position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);
@@ -372,22 +383,25 @@ function renderCatalogue(){
     const section = document.createElement('div');
     section.className = 'category';
 
-    const hasOptCol = cat.items.some(i => i.type !== 'qty');
+    // Any item needing size/colour options gets its own wider "Qty" column
+    // showing one small quantity box per option, so a customer can order
+    // e.g. 5 Red AND 3 Blue of the same product on a single line.
+    const hasOptItems = cat.items.some(i => i.type !== 'qty');
     let rows = '';
     cat.items.forEach(item => {
       idx++;
       const id = 'item-' + idx;
-      let optCell = '<td class="opt-col"></td>';
-      if(item.type === 'qty+size'){
-        optCell = `<td class="opt-col"><select class="opt-select" id="${id}-opt" data-role="opt">
-          <option value="">Size…</option>
-          ${SIZE_OPTIONS.map(s => `<option value="${s}">${s}</option>`).join('')}
-        </select></td>`;
-      } else if(item.type === 'qty+colour'){
-        optCell = `<td class="opt-col"><select class="opt-select" id="${id}-opt" data-role="opt">
-          <option value="">Colour…</option>
-          ${COLOUR_OPTIONS.map(c => `<option value="${c}">${c}</option>`).join('')}
-        </select></td>`;
+      let qtyCell;
+      if(item.type === 'qty+size' || item.type === 'qty+colour'){
+        const options = item.type === 'qty+size' ? SIZE_OPTIONS : COLOUR_OPTIONS;
+        const boxes = options.map(opt => `
+          <div class="opt-qty-cell">
+            <label>${opt}</label>
+            <input type="number" min="0" step="1" class="qty-input" data-role="qty" data-option="${opt}" placeholder="0">
+          </div>`).join('');
+        qtyCell = `<td class="opt-qty-col"><div class="opt-qty-group">${boxes}</div></td>`;
+      } else {
+        qtyCell = `<td class="qty-col"><input type="number" min="0" step="1" class="qty-input" id="${id}-qty" data-role="qty" placeholder="0"></td>`;
       }
       rows += `
         <tr data-item="1" data-code="${item.code}" data-name="${item.name}" data-pack="${item.pack}">
@@ -397,8 +411,7 @@ function renderCatalogue(){
             ${item.code ? `<div class="code">Code: ${item.code}</div>` : ''}
           </td>
           <td class="pack">${item.pack}</td>
-          ${hasOptCol ? optCell : ''}
-          <td class="qty-col"><input type="number" min="0" step="1" class="qty-input" id="${id}-qty" data-role="qty" placeholder="0"></td>
+          ${qtyCell}
         </tr>`;
     });
 
@@ -409,8 +422,7 @@ function renderCatalogue(){
           <tr>
             <th>Product</th>
             <th>Pack</th>
-            ${hasOptCol ? '<th class="opt-col">Option</th>' : ''}
-            <th class="qty-col">Qty</th>
+            <th class="${hasOptItems ? 'opt-qty-col' : 'qty-col'}">Qty</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -427,11 +439,10 @@ document.addEventListener('input', e => {
   }
 });
 function updateCount(){
-  const rows = document.querySelectorAll('tr[data-item="1"]');
+  const qtyInputs = document.querySelectorAll('[data-role="qty"]');
   let count = 0;
-  rows.forEach(row => {
-    const qtyInput = row.querySelector('[data-role="qty"]');
-    if(qtyInput && parseInt(qtyInput.value,10) > 0) count++;
+  qtyInputs.forEach(input => {
+    if(parseInt(input.value,10) > 0) count++;
   });
   document.getElementById('item-count').textContent = count;
 }
@@ -459,19 +470,22 @@ function submitOrder(){
   const rows = document.querySelectorAll('tr[data-item="1"]');
   const lines = [];
   rows.forEach(row => {
-    const qtyInput = row.querySelector('[data-role="qty"]');
-    const qty = qtyInput ? parseInt(qtyInput.value,10) : 0;
-    if(qty > 0){
-      const optSelect = row.querySelector('[data-role="opt"]');
-      const opt = optSelect ? optSelect.value : '';
-      const name = row.dataset.name;
-      const code = row.dataset.code;
-      const pack = row.dataset.pack;
-      let line = `${qty} x ${name} (${pack})`;
-      if(opt) line += ` — ${opt}`;
-      if(code) line += ` [Code: ${code}]`;
-      lines.push(line);
-    }
+    const name = row.dataset.name;
+    const code = row.dataset.code;
+    const pack = row.dataset.pack;
+    // A row may have one plain qty box, or several (one per size/colour) —
+    // walk all of them so every variant ordered on this line gets included.
+    const qtyInputs = row.querySelectorAll('[data-role="qty"]');
+    qtyInputs.forEach(qtyInput => {
+      const qty = parseInt(qtyInput.value, 10);
+      if(qty > 0){
+        const opt = qtyInput.dataset.option || '';
+        let line = `${qty} x ${name} (${pack})`;
+        if(opt) line += ` — ${opt}`;
+        if(code) line += ` [Code: ${code}]`;
+        lines.push(line);
+      }
+    });
   });
 
   if(lines.length === 0){
