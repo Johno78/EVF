@@ -138,6 +138,15 @@
   }
   td.opt-qty-col{width:auto;}
 
+  /* Sold out state */
+  tr.sold-out .pname{color:var(--grey);}
+  tr.sold-out{background:var(--cream);}
+  .sold-badge{
+    display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:700;
+    letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:10px;margin-top:4px;
+  }
+  tr.sold-out .qty-input{background:var(--border);color:var(--grey);cursor:not-allowed;}
+
   /* ---------- Submit bar ---------- */
   .submit-bar{
     position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);
@@ -311,6 +320,7 @@ const CATALOGUE = [
   { category: "SURE Chemical Concentrates", items: [
     { code:"101106882", name:"SURE Conc Plus Divermite", desc:"Super conc' hand dish wash detergent used in divermite dispenser", pack:"2.0L", type:"qty" },
     { code:"100920827", name:"SURE Interior & Surface Cleaner", desc:"Super conc' interior & surface cleaner, smart dose", pack:"1.4L", type:"qty" },
+    { code:"100920829", name:"SURE Floor Cleaner", desc:"Super conc' floor cleaner, smart dose", pack:"1.4L", type:"qty" },
     { code:"100919510", name:"SURE Smart Dose Degreaser", desc:"Degreaser for cleaning cookers, microwaves etc.", pack:"1.4L", type:"qty" },
     { code:"100943914", name:"SURE Grill", desc:"Oven & grill cleaner", pack:"750ml", type:"qty" },
     { code:"100919531", name:"SURE Smart Dose Sanitiser", desc:"Super conc' sanitiser for all food contact surfaces, inc. fridges and freezers", pack:"1.4L", type:"qty" },
@@ -366,7 +376,7 @@ const CATALOGUE = [
   ]},
   { category: "Kitchen Equipment & Food Safety", items: [
     { code:"NVMIT17", name:"Nevilles Oven Mitt", desc:"", pack:"1 pair", type:"qty" },
-    { code:"ETI810-730", name:"ETI Folding Temp Probe", desc:"", pack:"x1", type:"qty" },
+    { code:"J242", name:"Folding Temp Probe", desc:"", pack:"x1", type:"qty" },
     { code:"HOLCHOPTK22", name:"Holchem Probe Wipes", desc:"Pack of 150", pack:"x1", type:"qty" },
     { code:"ETI831-105", name:"ETI Temperature Log Book", desc:"", pack:"x1", type:"qty" },
     { code:"DIDAY", name:"DI Day Label", desc:"", pack:"x1", type:"qty" },
@@ -391,24 +401,26 @@ function renderCatalogue(){
     cat.items.forEach(item => {
       idx++;
       const id = 'item-' + idx;
+      const disabled = item.soldOut ? 'disabled' : '';
       let qtyCell;
       if(item.type === 'qty+size' || item.type === 'qty+colour'){
         const options = item.type === 'qty+size' ? SIZE_OPTIONS : COLOUR_OPTIONS;
         const boxes = options.map(opt => `
           <div class="opt-qty-cell">
             <label>${opt}</label>
-            <input type="number" min="0" step="1" class="qty-input" data-role="qty" data-option="${opt}" placeholder="0">
+            <input type="number" min="0" step="1" class="qty-input" data-role="qty" data-option="${opt}" placeholder="0" ${disabled}>
           </div>`).join('');
         qtyCell = `<td class="opt-qty-col"><div class="opt-qty-group">${boxes}</div></td>`;
       } else {
-        qtyCell = `<td class="qty-col"><input type="number" min="0" step="1" class="qty-input" id="${id}-qty" data-role="qty" placeholder="0"></td>`;
+        qtyCell = `<td class="qty-col"><input type="number" min="0" step="1" class="qty-input" id="${id}-qty" data-role="qty" placeholder="0" ${disabled}></td>`;
       }
       rows += `
-        <tr data-item="1" data-code="${item.code}" data-name="${item.name}" data-pack="${item.pack}">
+        <tr data-item="1" data-code="${item.code}" data-name="${item.name}" data-pack="${item.pack}"${item.soldOut ? ' class="sold-out"' : ''}>
           <td>
             <div class="pname">${item.name}</div>
             ${item.desc ? `<div class="pdesc">${item.desc}</div>` : ''}
             ${item.code ? `<div class="code">Code: ${item.code}</div>` : ''}
+            ${item.soldOut ? `<div class="sold-badge">Sold Out</div>` : ''}
           </td>
           <td class="pack">${item.pack}</td>
           ${qtyCell}
